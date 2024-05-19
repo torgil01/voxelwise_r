@@ -1,53 +1,33 @@
 # simple test for voxel-wise statistics
 
-
-# use rat data 
-# first use lm and verify with spm
-
-# Model 
-# y(img) ~ group 
-
-
-# libs
-library(RNifti)
-
-image <- readNifti(system.file("extdata", "example.nii.gz", package="RNifti"))
-
 # perhaps neuroim is better ?
 # https://cran.r-project.org/web/packages/neuroim/index.html
 # spare classes
 
-data <- 1:10
-indices <- seq(1,1000, length.out=10)
-bspace <- BrainSpace(c(64,64,64), spacing=c(1,1,1))
-sparsevol <- SparseBrainVolume(data,bspace,indices=indices)
-densevol <- BrainVolume(data,bspace,indices=indices)
-sum(sparsevol) == sum(densevol)
+#https://bbuchsbaum.github.io/neuroim2/index.html
+library(neuroim2)
+
+fw_file='/home/torgil/1030/dti_fa_1.nii.gz'
+mask_file='/home/torgil/1030/wm_mask_1.nii.gz'
+
+#  for reading 4d volumes 
+# vec <- read_vec(file_name)
 
 
-# ants 
-# read y data 
+vol <- read_vol(fw_file)
+mask <- read_vol(mask_file)
+indices <- which(mask!=0)
+# vectorize vol
+dat <- vol[indices]
+beta <- array(0,length(dat))
+# iterate
+for (i in 1:length(dat)) {
+  
+  # run model for i 
+  
+  # collect beta
+  beta[i] <- mod.beta
+}
 
-# mnifilename<-getANTsRData("mni")
-# img<-antsImageRead(mnifilename)
-# antsImageWrite(img,mnifilename)
-# antsGetSpacing(img)
-# antsGetDirection(img)
-# antsGetOrigin(img)
-# print(antsGetPixels(img,50,60,44))
-# print(max(img))
-# 
-# mat<-imageListToMatrix( ilist, mask )
-# age<-rnorm( nrow(mat) ) # simulated age
-# gender<-rep( c("F","M"), nrow(mat)/2 ) # simulated gender
-# # this creates "real" but noisy effects to detect
-# mat<-mat*(age^2+rnorm(nrow(mat)))
-# mdl<-lm( mat ~ age + gender )
-# mdli<-bigLMStats( mdl, 1.e-4 )
-# print(names(mdli))
-# print(rownames(mdli$beta.t))
-# print(paste("age",min(p.adjust(mdli$beta.pval[1,]))))
-# print(paste("gen",min(p.adjust(mdli$beta.pval[2,]))))
-# 
-# agebetas<-makeImage( mask , mdli$beta.t[1,] )
-# antsImageWrite( agebetas, tempfile(fileext ='.nii.gz') )
+
+# write beta as image
