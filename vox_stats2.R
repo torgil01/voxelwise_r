@@ -26,9 +26,16 @@ vox_stats2 <- function(variables) {
   # iterate
   for (i in 1:nvox) {
     y = dat[i,]
-    l <- lm(y ~ age)
+    
+    # linear regression
+    l <- lm(y ~ grp)
+    
+    # logistic regresson
+    logit <- glm(wmh ~ free_water + age + sex, family = "binomial")
+    
+    
     # run model for i 
-    beta[i] <- l$coefficients[2]
+    beta[i] <- logit$coefficients[2]
     # l[["coefficients"]][2]
     p_val[i] <- 1 - summary(l)$coefficients[,4][2]
   }
