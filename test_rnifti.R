@@ -27,22 +27,45 @@ nt <- im_dim[4]
 
 # reshape
 image <- array(image,c(nx*ny*nz,nt))
-mask <- array(mask,c(nx*ny*nz))
-indx <- which(mask > 0)
+mask_vec <- array(mask,c(nx*ny*nz))
+indx <- which(mask_vec > 0)
 
 # mk sparse
 im_sparse <- image[indx,] 
+sp_dim <- dim(im_sparse)
+nvox <- sp_dim[1]
+ntime <- sp_dim[2]
 
-# take average
-av_sparse <- rowMeans(im_sparse)
+# free memory
+rm(image)
+
+# contrast 
+grp <- c( 0, 0 , 0 , 0 , 0, 1 ,1 , 1 , 1, 1, 1)
+  
+# Note, R uses column order , so consecutive addresses are on first index
+p_val_sp <- array(0, c(nvox, 1)) 
+beta_sp <- array(0, c(nvox,1))
+# iterate
+for (i in 1:nvox) {
+  y = im_sparse[i,]
+  # linear regression
+  l <- lm(y ~ grp)
+  beta_sp[i] <- l$coefficients[2]
+  # l[["coefficients"]][2]
+  p_val_sp[i] <- 1 - summary(l)$coefficients[,4][2]
+}
+
 
 # reconstruct 
-av <- array(0,c(nx,ny,nz))
-av[indx] <- av_sparse
+p_val <- array(0,c(nx,ny,nz))
+beta <- array(0,c(nx,ny,nz))
+p_val[indx] <- p_val_sp
+beta[indx] <- beta_sp
 
 # save 
-av.nii <- asNifti(av,reference = mask)
-writeNifti(av.nii,"../voxelwise_data/average.nii.gz")
-# template = mask
-# this gives average, but image dims are zero for ny,nz, nt 
+pval.nii <- asNifti(p_val,reference = mask)
+writeNifti(pval.nii,"../voxelwise_data/pval.nii.gz")
+beta.nii <- asNifti(beta,reference = mask)
+writeNifti(beta.nii,"../voxelwise_data/beta.nii.gz")
+
 }
