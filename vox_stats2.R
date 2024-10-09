@@ -23,6 +23,8 @@ vox_stats2 <- function(variables) {
   im_sparse <- image[indx,] 
   grp <- c( 0, 0 , 0 , 0 , 0, 1 ,1 , 1 , 1, 1, 1)
   
+  # Note, R uses column order , so consecutive addresses are on first index
+  p <- array(0, nrow = size(im_sparse), ncol = 1) 
   # iterate
   for (i in 1:nvox) {
     y = dat[i,]
@@ -30,14 +32,12 @@ vox_stats2 <- function(variables) {
     # linear regression
     l <- lm(y ~ grp)
     
-    # logistic regresson
-    logit <- glm(wmh ~ free_water + age + sex, family = "binomial")
-    
-    
+    # logistic regression
+    # logit <- glm(wmh ~ free_water + age + sex, family = "binomial")
     # run model for i 
-    beta[i] <- logit$coefficients[2]
+    # beta[i] <- logit$coefficients[2]
     # l[["coefficients"]][2]
-    p_val[i] <- 1 - summary(l)$coefficients[,4][2]
+    # p_val[i] <- 1 - summary(l)$coefficients[,4][2]
   }
   
   beta <- array(beta,c(32,32,2))

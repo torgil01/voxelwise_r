@@ -1,4 +1,4 @@
-vox_stats <- function(variables) {
+vox_stats <- function() {
   # if we are not using spare we might just as well use rnifti 
   # need to check the 4d reading capabilities
   #https://bbuchsbaum.github.io/neuroim2/index.html
