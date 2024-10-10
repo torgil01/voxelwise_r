@@ -14,13 +14,14 @@ voxel_logistic <- function(df,pval_file, beta_file) {
   #   covar_1 ...
   
   # libs
-  library(RNifti)
-  library(readr)
+  #library(RNifti)
+  # need to use neuroim2
+  library(neuroim2)
   
   # read x, y data 
-  y_img <- readNifti(df$y_path)
-  x_img <- readNifti(df$x_path)
-  brainmask <- readNifti(df$mask_path[1])
+  y_img <- read_vec(df$wmh_path)
+  x_img <- read_vec(df$fw_path)
+  brainmask <- read_vec(df$mask_path[1])
 
   # put covars in vectors
   age <- df$age
@@ -28,7 +29,8 @@ voxel_logistic <- function(df,pval_file, beta_file) {
   num_covars = 2
 
   # get image dims 
-  im_dim <- dim(image)
+  im_dim <- dim(y_img)
+  cat("im_dim = ",im_dim)
   nx <- im_dim[1]
   ny <- im_dim[2]
   nz <- im_dim[3]
@@ -39,6 +41,10 @@ voxel_logistic <- function(df,pval_file, beta_file) {
   x_img <- array(x_img,c(nx*ny*nz,nt))
   mask_vec <- array(brainmask,c(nx*ny*nz))
   indx <- which(mask_vec > 0)
+  
+  # for easier implementation
+  # see https://bbuchsbaum.github.io/neuroim2/articles/NeuroVector.html
+  # 
   
   # mk sparse
   y_sparse <- y_img[indx,] 
@@ -76,9 +82,9 @@ voxel_logistic <- function(df,pval_file, beta_file) {
   beta[indx_4d] <- beta_sp
   
   # save 
-  pval.nii <- asNifti(pval,reference = mask)
-  writeNifti(pval.nii,pval_file)
-  beta.nii <- asNifti(beta,reference = mask)
-  writeNifti(beta.nii,beta_file)
+  #pval.nii <- asNifti(pval,reference = mask)
+  #writeNifti(pval.nii,pval_file)
+  #beta.nii <- asNifti(beta,reference = mask)
+  #writeNifti(beta.nii,beta_file)
 }
 
