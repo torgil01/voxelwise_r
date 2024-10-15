@@ -13,45 +13,63 @@ voxel_logistic <- function(df,pval_file, beta_file) {
   #   mask_path : path to white matter mask -- just one!
   #   covar_1 ...
   
+  
+  
   # libs
-  #library(RNifti)
-  # need to use neuroim2
-  library(neuroim2)
+  library(RNifti)
+  library(glm2)
+
+  # get number of timepoints
+  nt = nrow(df)
+
+  # read brainmask 
+  brainmask <- readNifti(df$mask_path[1])
+  # get image dims 
+  im_dim <- dim(brainmask)
+  cat("im_dim = ",im_dim,"\n")
+  nx <- im_dim[1]
+  ny <- im_dim[2]
+  nz <- im_dim[3]
   
   # read x, y data 
-  y_img <- read_vec(df$wmh_path)
-  x_img <- read_vec(df$fw_path)
-  brainmask <- read_vec(df$mask_path[1])
+  cat("reading x and y ..")
+  y_img <- array(0,c(nx,ny,nz,nt))
+  x_img <- array(0,c(nx,ny,nz,nt))
+  
+  for (i in 1:nt) {
+    cat(i,",")
+    y_img[,,,i] <- read_vec(df$wmh_path[i])
+    x_img[,,,i] <- read_vec(df$fw_path[i])
+  }  
+  cat("\n")
 
   # put covars in vectors
   age <- df$age
   sex <- df$sex
-  num_covars = 2
+  num_covars = 1
 
-  # get image dims 
-  im_dim <- dim(y_img)
-  cat("im_dim = ",im_dim)
-  nx <- im_dim[1]
-  ny <- im_dim[2]
-  nz <- im_dim[3]
-  nt <- im_dim[4]
+  
+  # make a mask that contains at least min_obs wmh, otherwise it is no point 
+  # running the logistic model!
+  min_obs = 10 
+  wmh_freq <- rowSums(y_img, dims = 3)
+  wmh_freq[wmh_freq < min_obs] <- 0
+  wmh_freq[wmh_freq >= min_obs] <- 1
+  mask_vec <- array(wmh_freq,c(nx*ny*nz))
+  indx <- which(mask_vec > 0)
+  rm(wmh_freq)
   
   # reshape x and y 
   y_img <- array(y_img,c(nx*ny*nz,nt))
   x_img <- array(x_img,c(nx*ny*nz,nt))
-  mask_vec <- array(brainmask,c(nx*ny*nz))
-  indx <- which(mask_vec > 0)
-  
-  # for easier implementation
-  # see https://bbuchsbaum.github.io/neuroim2/articles/NeuroVector.html
-  # 
   
   # mk sparse
   y_sparse <- y_img[indx,] 
   x_sparse <- x_img[indx,] 
-  sp_dim <- dim(im_sparse)
+  sp_dim <- dim(y_sparse)
   nvox <- sp_dim[1]
   ntime <- sp_dim[2]
+  cat("nii sparse image dims: nvox = ",nvox,", ntime = ",ntime,"\n")
   
   # free memory
   rm(x_img,y_img)
@@ -59,13 +77,17 @@ voxel_logistic <- function(df,pval_file, beta_file) {
   # allocate 
   # Note, R uses column order , so consecutive addresses are on first index
   # see : https://cran.r-project.org/web/packages/reticulate/vignettes/arrays.html
-  pval_sp <- array(0, c(nvox,covars + 1)) 
-  beta_sp <- array(0, c(nvox,covars + 1))
+  
+  con <- glm.control(maxit = 200)
+  pval_sp <- array(0, c(nvox,num_covars + 1)) 
+  beta_sp <- array(0, c(nvox,num_covars + 1))
+  cat("Running voxelwise regression\n")
   # iterate
   for (i in 1:nvox) {
-    y = im_sparse[i,]
+    y = y_sparse[i,]
+    x = x_sparse[i,]
     # linear regression
-    model <- glm( y ~ age + sex, family = binomial)
+    model <- glm2( y ~ x, family = binomial, control = con)
     s <- summary(model)
     beta_sp[i,] <- coef(s)[,1] # 
     pval_sp[i,] <- coef(s)[,4] # 
@@ -73,18 +95,31 @@ voxel_logistic <- function(df,pval_file, beta_file) {
   
   # reconstruct 
   # - first replicate index on 4th dim
-  shifts <- seq(from = 0, to = nx*ny*nz*(nn-1), by = nx*ny*nz)
-  indx_4d <- rep(indx, times = nn) + rep(shifts, each = length(indx))
+  cat("Reconstructing arrays\n")
+  shifts <- seq(from = 0, to = nx*ny*nz*(num_covars), by = nx*ny*nz)
+  cat("dim shifts = ", length(shifts),"class = ",class(shifts), "\n")
+  indx_4d <- rep(indx, times = nt) + rep(shifts, each = length(indx))
+  cat("dim indx_4d = ", length(indx_4d),"class = ",class(indx_4d), "\n")
   # - allocate arrays
-  pval <- array(0,c(nx,ny,nz, covars + 1))
-  beta <- array(0,c(nx,ny,nz, covars + 1))
+  pval <- array(0,c(nx,ny,nz, num_covars + 1))
+  cat("dim pval = ", dim(pval)," class pval = ", class(pval), '\n')
+  cat("dim pval_sp = ", dim(pval_sp)," class pval_sp = ", class(pval_sp), '\n')
+  beta <- array(0,c(nx,ny,nz, num_covars + 1))
   pval[indx_4d] <- pval_sp
   beta[indx_4d] <- beta_sp
   
+  
   # save 
-  #pval.nii <- asNifti(pval,reference = mask)
-  #writeNifti(pval.nii,pval_file)
-  #beta.nii <- asNifti(beta,reference = mask)
-  #writeNifti(beta.nii,beta_file)
+  cat("Saving betas and p-values\n")
+  cat("dim pval = ", dim(pval),'\n')
+  cat("dim beta = ", dim(beta),'\n')
+  pval.nii <- asNifti(pval)
+  writeNifti(pval.nii,pval_file,template = brainmask)
+  beta.nii <- asNifti(beta)
+  writeNifti(beta.nii,beta_file, template = brainmask)
+  
+  # test
+  data <- list("y" = y_sparse[900,], "x" = x_sparse[900,], "age" = age, "sex" = sex )
+  return(data)
 }
 
