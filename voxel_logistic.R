@@ -1,4 +1,4 @@
-voxel_logistic <- function(df,pval_file, beta_file) {
+voxel_logistic <- function(df,pval_file, beta_file, mask_file) {
   # voxel-wise logistic regression 
   # Inputs
   # 1. y = binary 4d mask of wmh lesions for each person
@@ -38,25 +38,28 @@ voxel_logistic <- function(df,pval_file, beta_file) {
   
   for (i in 1:nt) {
     cat(i,",")
-    y_img[,,,i] <- read_vec(df$wmh_path[i])
-    x_img[,,,i] <- read_vec(df$fw_path[i])
+    y_img[,,,i] <- readNifti(df$wmh_path[i])
+    x_img[,,,i] <- readNifti(df$fw_path[i])
   }  
   cat("\n")
 
   # put covars in vectors
   age <- df$age
   sex <- df$sex
-  num_covars = 1
-
+  num_covars = 3
   
   # make a mask that contains at least min_obs wmh, otherwise it is no point 
   # running the logistic model!
-  min_obs = 10 
+  min_obs = 1  # use 10*num_covars  .. "one in ten rule" 
   wmh_freq <- rowSums(y_img, dims = 3)
   wmh_freq[wmh_freq < min_obs] <- 0
   wmh_freq[wmh_freq >= min_obs] <- 1
-  mask_vec <- array(wmh_freq,c(nx*ny*nz))
+  mask_vec <- array(wmh_freq,c(nx*ny*nz)) 
   indx <- which(mask_vec > 0)
+  
+  # save mask vec
+  wmh_freq.nii <- asNifti(wmh_freq)
+  writeNifti(wmh_freq.nii,mask_file,template = brainmask)
   rm(wmh_freq)
   
   # reshape x and y 
@@ -87,7 +90,7 @@ voxel_logistic <- function(df,pval_file, beta_file) {
     y = y_sparse[i,]
     x = x_sparse[i,]
     # linear regression
-    model <- glm2( y ~ x, family = binomial, control = con)
+    model <- glm2( y ~ x + age + sex, family = binomial, control = con)
     s <- summary(model)
     beta_sp[i,] <- coef(s)[,1] # 
     pval_sp[i,] <- coef(s)[,4] # 
@@ -119,7 +122,7 @@ voxel_logistic <- function(df,pval_file, beta_file) {
   writeNifti(beta.nii,beta_file, template = brainmask)
   
   # test
-  data <- list("y" = y_sparse[900,], "x" = x_sparse[900,], "age" = age, "sex" = sex )
+  data <- list("y" = y_sparse[5000,], "x" = x_sparse[5000,], "age" = age, "sex" = sex )
   return(data)
 }
 
